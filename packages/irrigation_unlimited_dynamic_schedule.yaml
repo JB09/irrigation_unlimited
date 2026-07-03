@@ -1,0 +1,250 @@
+# Filename: irrigation_unlimited_dynamic_schedule.yaml
+#
+# Dynamic irrigation scheduling for Irrigation Unlimited (rain-skip +
+# all-or-nothing min-deficit skip + deficit-driven extra watering days).
+#
+# WHAT IT DOES
+#   The static Mon/Thu/Fri "Morning" schedule keeps running; only *whether*
+#   it waters becomes dynamic. Nothing here changes the run time-of-day, and
+#   it needs no IU YAML edits, no schedule_id, and no load_schedule.
+#     1. Rain-skip .......... 10 min before the run, if forecast rain today is
+#                             >= the rain threshold, skip the WHOLE run.
+#     2. Min-deficit skip ... if EVERY zone's deficit is below the min
+#                             threshold, skip the WHOLE run (all-or-nothing);
+#                             the deficits aggregate to the next run.
+#     3. Extra day .......... on a non-run day, if ANY zone's deficit grows
+#                             past the extra-day threshold (and no rain), run
+#                             the FULL sequence early (cycle-and-soak).
+#   All trigger times derive from the controller's next_start time-of-day, so
+#   changing the IU YAML run time moves everything (incl. the SI push) with it.
+#
+# HOW SKIP WORKS (and self-heals)
+#   A skip sets every sequence-zone's adjustment to actual 00:00:00 (zone
+#   level). IU drops any zone with a zero duration, so the run is skipped with
+#   no phantom valve toggle. The daily Smart Irrigation push writes fresh
+#   per-zone `actual` durations, overwriting the zeros, so the skip is
+#   automatically undone the next cycle. (Do NOT use a sequence-level
+#   `percentage: 0` for the skip - that adjustment is sticky and the per-zone
+#   push does not clear it, which would disable watering permanently.)
+#
+# IMPORTANT - THIS IS A VERSION-CONTROLLED MIRROR
+#   The live system was built with UI/config-flow (storage) helpers +
+#   automations via the Home Assistant API. This file is a faithful,
+#   reproducible copy for source control / disaster recovery / porting to a
+#   fresh HA. Do NOT load it alongside the already-created storage helpers of
+#   the same name - HA would create duplicate `_2` entities. Load it only on a
+#   system that does NOT already have these entities.
+#
+#   Package install: put this file in config/packages and add to
+#   configuration.yaml:
+#     homeassistant:
+#       packages: !include_dir_named packages
+#
+# SMART IRRIGATION PUSH (existing automation - trigger change only)
+#   The existing "Smart Irrigation - Push Durations to IU" automation
+#   (unique_id 1780451772880) is NOT redefined here (it lives in storage).
+#   Its trigger was changed from a fixed `at: "04:15:00"` to:
+#     triggers:
+#       - trigger: time
+#         at: sensor.irrigation_si_push_time
+#   so the push follows the IU run time dynamically. Everything else in that
+#   automation is unchanged.
+
+input_boolean:
+  irrigation_dynamic_enable:
+    name: Irrigation Dynamic Enable
+    icon: mdi:water-sync
+    # No YAML `initial` for input_boolean - turn it on after first load.
+
+input_number:
+  irrigation_rain_skip_threshold:
+    name: Irrigation Rain Skip Threshold
+    min: 0
+    max: 2
+    step: 0.05
+    initial: 0.2
+    unit_of_measurement: in
+    mode: slider
+    icon: mdi:weather-rainy
+  irrigation_min_deficit_threshold:
+    name: Irrigation Min Deficit Threshold
+    min: 0
+    max: 1
+    step: 0.05
+    initial: 0.2
+    unit_of_measurement: in
+    mode: slider
+    icon: mdi:water-minus
+  irrigation_extra_day_deficit_threshold:
+    name: Irrigation Extra Day Deficit Threshold
+    min: 0
+    max: 2
+    step: 0.05
+    initial: 0.6
+    unit_of_measurement: in
+    mode: slider
+    icon: mdi:water-plus
+
+template:
+  # Largest zone moisture deficit, in inches (positive = dry). SI `bucket` is
+  # 0 at field capacity and negative when dry, so deficit = max(0, -bucket).
+  # Drives both the all-dry whole-run skip and the extra-day trigger via
+  # native numeric_state conditions.
+  - sensor:
+      - name: Irrigation Max Deficit
+        unit_of_measurement: in
+        state: >
+          {% set zones = ['front','side_right','side_left','back_right','back_center','back_left'] %}
+          {% set ns = namespace(m=0.0) %}
+          {% for z in zones %}
+          {% set b = state_attr('sensor.smart_irrigation_' ~ z, 'bucket') | float(0) %}
+          {% set ns.m = [ns.m, (-b if b < 0 else 0)] | max %}
+          {% endfor %}
+          {{ ns.m | round(3) }}
+
+  # Timestamp anchors = today @ (run clock-time - offset). All derive from the
+  # IU controller's next_start time-of-day, so they shift automatically when
+  # the IU run time changes. Order: SI push (-15) < gate (-10) < extra-day (-5)
+  # < run.
+  - sensor:
+      - name: Irrigation SI Push Time
+        device_class: timestamp
+        availability: >
+          {{ state_attr('binary_sensor.irrigation_unlimited_c1_m','next_start') not in [none,'unknown','unavailable'] }}
+        state: >
+          {% set t = as_datetime(state_attr('binary_sensor.irrigation_unlimited_c1_m','next_start')) | as_local %}
+          {{ (now().replace(hour=t.hour, minute=t.minute, second=0, microsecond=0) - timedelta(minutes=15)).isoformat() }}
+      - name: Irrigation Pregate Time
+        device_class: timestamp
+        availability: >
+          {{ state_attr('binary_sensor.irrigation_unlimited_c1_m','next_start') not in [none,'unknown','unavailable'] }}
+        state: >
+          {% set t = as_datetime(state_attr('binary_sensor.irrigation_unlimited_c1_m','next_start')) | as_local %}
+          {{ (now().replace(hour=t.hour, minute=t.minute, second=0, microsecond=0) - timedelta(minutes=10)).isoformat() }}
+      - name: Irrigation Extra Day Time
+        device_class: timestamp
+        availability: >
+          {{ state_attr('binary_sensor.irrigation_unlimited_c1_m','next_start') not in [none,'unknown','unavailable'] }}
+        state: >
+          {% set t = as_datetime(state_attr('binary_sensor.irrigation_unlimited_c1_m','next_start')) | as_local %}
+          {{ (now().replace(hour=t.hour, minute=t.minute, second=0, microsecond=0) - timedelta(minutes=5)).isoformat() }}
+
+  # True only on a day that has a scheduled Morning run (next_start is today).
+  # Evaluated before the run, so it reliably distinguishes run days from
+  # off-days: the pre-run gate requires it on, the extra-day requires it off.
+  - binary_sensor:
+      - name: Irrigation Run Scheduled Today
+        state: >
+          {% set nsattr = state_attr('binary_sensor.irrigation_unlimited_c1_m','next_start') %}
+          {{ nsattr not in [none,'unknown','unavailable'] and (as_datetime(nsattr)|as_local).date() == now().date() }}
+
+automation:
+  # 1) Pre-run gate: 10 min before the scheduled run, skip the WHOLE run if
+  #    rain is forecast, or if every zone is below the min-deficit threshold.
+  #    Otherwise it does nothing and the run proceeds with SI durations.
+  - id: irrigation_dynamic_pre_run_gate
+    alias: Irrigation Dynamic Pre-Run Gate
+    description: >
+      All-or-nothing skip of the scheduled IU run for rain or when every zone
+      is below the min-deficit threshold. Zeroes every zone at the zone level
+      (actual 0), which the next SI push overwrites so the skip self-heals.
+    mode: single
+    triggers:
+      - trigger: time
+        at: sensor.irrigation_pregate_time
+    conditions:
+      - condition: state
+        entity_id: input_boolean.irrigation_dynamic_enable
+        state: "on"
+      - condition: state
+        entity_id: binary_sensor.irrigation_run_scheduled_today
+        state: "on"
+    actions:
+      - choose:
+          # Rain forecast -> skip whole run
+          - conditions:
+              - condition: numeric_state
+                entity_id: sensor.forecasted_rain_today
+                above: input_number.irrigation_rain_skip_threshold
+            sequence:
+              - action: irrigation_unlimited.adjust_time
+                data:
+                  entity_id: binary_sensor.irrigation_unlimited_c1_m
+                  sequence_id: 0
+                  zones: [1, 2, 3]
+                  actual: "00:00:00"
+              - action: persistent_notification.create
+                data:
+                  notification_id: irrigation_dynamic_gate
+                  title: "Irrigation: rain skip"
+                  message: >
+                    Skipped today's scheduled run - forecast rain
+                    {{ states('sensor.forecasted_rain_today') }} in >= threshold
+                    {{ states('input_number.irrigation_rain_skip_threshold') }} in.
+          # Every zone below the min-deficit threshold -> skip whole run
+          - conditions:
+              - condition: numeric_state
+                entity_id: sensor.irrigation_max_deficit
+                below: input_number.irrigation_min_deficit_threshold
+            sequence:
+              - action: irrigation_unlimited.adjust_time
+                data:
+                  entity_id: binary_sensor.irrigation_unlimited_c1_m
+                  sequence_id: 0
+                  zones: [1, 2, 3]
+                  actual: "00:00:00"
+              - action: persistent_notification.create
+                data:
+                  notification_id: irrigation_dynamic_gate
+                  title: "Irrigation: all zones below threshold"
+                  message: >
+                    Skipped today's scheduled run - all zones' deficit under
+                    {{ states('input_number.irrigation_min_deficit_threshold') }} in
+                    (max {{ states('sensor.irrigation_max_deficit') }} in).
+                    Aggregating to the next run.
+
+  # 2) Extra day: on a non-run day, ~5 min before the usual clock-time, run the
+  #    FULL sequence early if any zone's deficit passed the extra-day threshold
+  #    and no rain is forecast. All-or-nothing (every zone to its SI duration).
+  - id: irrigation_dynamic_extra_day
+    alias: Irrigation Dynamic Extra Day
+    description: >
+      Adds a full watering cycle on off-days when the driest zone's deficit
+      exceeds the extra-day threshold. Never runs on a scheduled day.
+    mode: single
+    triggers:
+      - trigger: time
+        at: sensor.irrigation_extra_day_time
+    conditions:
+      - condition: state
+        entity_id: input_boolean.irrigation_dynamic_enable
+        state: "on"
+      - condition: state
+        entity_id: binary_sensor.irrigation_run_scheduled_today
+        state: "off"
+      - condition: state
+        entity_id: binary_sensor.irrigation_unlimited_c1_m
+        state: "off"
+      - condition: numeric_state
+        entity_id: sensor.forecasted_rain_today
+        below: input_number.irrigation_rain_skip_threshold
+      - condition: numeric_state
+        entity_id: sensor.irrigation_max_deficit
+        above: input_number.irrigation_extra_day_deficit_threshold
+    actions:
+      - action: irrigation_unlimited.manual_run
+        data:
+          entity_id: binary_sensor.irrigation_unlimited_c1_m
+          sequence_id: 1
+      - action: irrigation_unlimited.manual_run
+        data:
+          entity_id: binary_sensor.irrigation_unlimited_c1_m
+          sequence_id: 2
+      - action: persistent_notification.create
+        data:
+          notification_id: irrigation_dynamic_extra_day
+          title: "Irrigation: extra watering day"
+          message: >
+            Ran an extra cycle - max zone deficit
+            {{ states('sensor.irrigation_max_deficit') }} in >= threshold
+            {{ states('input_number.irrigation_extra_day_deficit_threshold') }} in.
