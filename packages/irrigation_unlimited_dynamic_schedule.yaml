@@ -8,13 +8,16 @@
 #   it waters becomes dynamic. Nothing here changes the run time-of-day, and
 #   it needs no IU YAML edits, no schedule_id, and no load_schedule.
 #     1. Rain-skip .......... 10 min before the run, if forecast rain today is
-#                             >= the rain threshold, skip the WHOLE run.
+#                             >= the rain threshold, skip the WHOLE run - UNLESS
+#                             the driest zone is at/above the extra-day threshold
+#                             (very dry overrides the forecast and waters).
 #     2. Min-deficit skip ... if EVERY zone's deficit is below the min
 #                             threshold, skip the WHOLE run (all-or-nothing);
 #                             the deficits aggregate to the next run.
 #     3. Extra day .......... on a non-run day, if ANY zone's deficit grows
-#                             past the extra-day threshold (and no rain), run
-#                             the FULL sequence early (cycle-and-soak).
+#                             past the extra-day threshold, run the FULL sequence
+#                             early (cycle-and-soak). This dryness also overrides
+#                             the rain forecast.
 #   All trigger times derive from the controller's next_start time-of-day, so
 #   changing the IU YAML run time moves everything (incl. the SI push) with it.
 #
@@ -140,14 +143,18 @@ template:
 
 automation:
   # 1) Pre-run gate: 10 min before the scheduled run, skip the WHOLE run if
-  #    rain is forecast, or if every zone is below the min-deficit threshold.
-  #    Otherwise it does nothing and the run proceeds with SI durations.
+  #    rain is forecast (only while the driest zone is under the extra-day
+  #    threshold - a deficit at/above it overrides rain and waters), or if every
+  #    zone is below the min-deficit threshold. Otherwise it does nothing and the
+  #    run proceeds with SI durations.
   - id: irrigation_dynamic_pre_run_gate
     alias: Irrigation Dynamic Pre-Run Gate
     description: >
-      All-or-nothing skip of the scheduled IU run for rain or when every zone
-      is below the min-deficit threshold. Zeroes every zone at the zone level
-      (actual 0), which the next SI push overwrites so the skip self-heals.
+      All-or-nothing skip of the scheduled IU run for rain (unless the driest
+      zone is at/above the extra-day threshold, which overrides rain) or when
+      every zone is below the min-deficit threshold. Zeroes every zone at the
+      zone level (actual 0), which the next SI push overwrites so the skip
+      self-heals.
     mode: single
     triggers:
       - trigger: time
@@ -161,11 +168,15 @@ automation:
         state: "on"
     actions:
       - choose:
-          # Rain forecast -> skip whole run
+          # Rain forecast AND not yet extra-day dry -> skip whole run.
+          # A deficit at/above the extra-day threshold overrides rain and waters.
           - conditions:
               - condition: numeric_state
                 entity_id: sensor.forecasted_rain_today
                 above: input_number.irrigation_rain_skip_threshold
+              - condition: numeric_state
+                entity_id: sensor.irrigation_max_deficit
+                below: input_number.irrigation_extra_day_deficit_threshold
             sequence:
               - action: irrigation_unlimited.adjust_time
                 data:
@@ -204,13 +215,15 @@ automation:
                     Aggregating to the next run.
 
   # 2) Extra day: on a non-run day, ~5 min before the usual clock-time, run the
-  #    FULL sequence early if any zone's deficit passed the extra-day threshold
-  #    and no rain is forecast. All-or-nothing (every zone to its SI duration).
+  #    FULL sequence early whenever any zone's deficit passed the extra-day
+  #    threshold. This dryness overrides the rain forecast (no rain condition).
+  #    All-or-nothing (every zone to its SI duration).
   - id: irrigation_dynamic_extra_day
     alias: Irrigation Dynamic Extra Day
     description: >
       Adds a full watering cycle on off-days when the driest zone's deficit
-      exceeds the extra-day threshold. Never runs on a scheduled day.
+      exceeds the extra-day threshold, regardless of the rain forecast. Never
+      runs on a scheduled day.
     mode: single
     triggers:
       - trigger: time
@@ -225,9 +238,8 @@ automation:
       - condition: state
         entity_id: binary_sensor.irrigation_unlimited_c1_m
         state: "off"
-      - condition: numeric_state
-        entity_id: sensor.forecasted_rain_today
-        below: input_number.irrigation_rain_skip_threshold
+      # No rain condition: a deficit past the extra-day threshold overrides the
+      # forecast, so an extra cycle runs whether or not rain is forecast.
       - condition: numeric_state
         entity_id: sensor.irrigation_max_deficit
         above: input_number.irrigation_extra_day_deficit_threshold
