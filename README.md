@@ -53,7 +53,7 @@
   - [7.2. Actions `pause` and `resume`](#72-actions-pause-and-resume)
   - [7.3. Action `suspend`](#73-action-suspend)
   - [7.4. Action `cancel`](#74-action-cancel)
-  - [7.5. Action `skip`](#75-action-skip)
+  - [7.5. Action `skip_zone`](#75-action-skip_zone)
   - [7.6. Action `skip_run`](#76-action-skip_run)
   - [7.7. Action `manual_run`](#77-action-manual_run)
   - [7.8. Action `adjust_time`](#78-action-adjust_time)
@@ -834,7 +834,7 @@ The binary sensor associated with each controller and zone provide several servi
 - `toggle`
 - `suspend`
 - `cancel`
-- `skip`
+- `skip_zone`
 - `skip_run`
 - `manual_run`
 - `adjust_time`
@@ -888,9 +888,11 @@ Cancels the current running schedule.
 | ---------------------- | ---- | -------- | ----------- |
 | `entity_id` | [string/list](#141-irrigation-unlimited-entities) | yes | Controller or zone to cancel. |
 
-### 7.5. Action `skip`
+### 7.5. Action `skip_zone`
 
 Advance a *running* sequence to its next zone. The remainder of the current zone is abandoned and the sequence carries on from the following one. This does not touch the schedule. To drop a run which has not started yet see [`skip_run`](#76-action-skip_run).
+
+> **Renamed.** This action was called `skip` in earlier versions. The old name no longer exists, so any automation or script calling `irrigation_unlimited.skip` must be updated to `irrigation_unlimited.skip_zone`.
 
 | Service data attribute | Type | Required | Description |
 | ---------------------- | ---- | -------- | ----------- |

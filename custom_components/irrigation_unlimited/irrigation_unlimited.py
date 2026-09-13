@@ -231,8 +231,8 @@ from .const import (
     SERVICE_MANUAL_RUN,
     SERVICE_PAUSE,
     SERVICE_RESUME,
-    SERVICE_SKIP,
     SERVICE_SKIP_RUN,
+    SERVICE_SKIP_ZONE,
     SERVICE_SUSPEND,
     SERVICE_TIME_ADJUST,
     SERVICE_TOGGLE,
@@ -3638,7 +3638,7 @@ class IUSequenceRun(IUBase):
             if current_vol >= limit:
                 await self._coordinator.hass.services.async_call(
                     DOMAIN,
-                    SERVICE_SKIP,
+                    SERVICE_SKIP_ZONE,
                     {ATTR_ENTITY_ID: self._sequence.entity_id},
                 )
 
@@ -4772,7 +4772,7 @@ class IUSequence(IUBase):
             self.request_update()
         return changed
 
-    def service_skip(self, data: MappingProxyType, stime: datetime) -> bool:
+    def service_skip_zone(self, data: MappingProxyType, stime: datetime) -> bool:
         """Skip to the next sequence zone"""
         # pylint: disable=unused-argument
         changed = False
@@ -7648,9 +7648,9 @@ class IUCoordinator:
                 changed = zone.service_manual_run(data1, stime)
             else:
                 changed = controller.service_manual_run(data1, stime)
-        elif service == SERVICE_SKIP:
+        elif service == SERVICE_SKIP_ZONE:
             if sequence is not None:
-                changed = sequence.service_skip(data1, stime)
+                changed = sequence.service_skip_zone(data1, stime)
         elif service == SERVICE_SKIP_RUN:
             if sequence is not None:
                 changed = sequence.service_skip_run(data1, stime)
