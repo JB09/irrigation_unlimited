@@ -11,6 +11,7 @@ from tests.iu_test_support import IUExam
 IUExam.quiet_mode()
 
 SEQUENCE = "binary_sensor.irrigation_unlimited_c1_s1"
+ZONE = "binary_sensor.irrigation_unlimited_c1_z1"
 
 
 async def queue_two_manual_runs(exam: IUExam) -> None:
@@ -50,6 +51,19 @@ async def test_manual_run_retained(
         await exam.call(
             SERVICE_LOAD_SCHEDULE, {"schedule_id": "morning", "time": "06:30"}
         )
+        sequence = exam.coordinator.controllers[0].sequences[0]
+        assert sum(1 for sqr in sequence.runs if sqr.is_manual()) == 2
+        await exam.finish_test()
+
+        await exam.begin_test(4)
+        # Put test 3's schedule back so this case stands on its own
+        await exam.call(
+            SERVICE_LOAD_SCHEDULE, {"schedule_id": "morning", "time": "06:00"}
+        )
+        await queue_two_manual_runs(exam)
+        # A zone adjustment does not change which zones take part in the run,
+        # so the built manual runs stay valid
+        await exam.call(SERVICE_TIME_ADJUST, {"entity_id": ZONE, "percentage": 50})
         sequence = exam.coordinator.controllers[0].sequences[0]
         assert sum(1 for sqr in sequence.runs if sqr.is_manual()) == 2
         await exam.finish_test()

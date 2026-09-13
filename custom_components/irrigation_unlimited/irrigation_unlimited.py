@@ -5131,12 +5131,19 @@ class IUController(IUBase):
             for zone in zones:
                 zone.runs.clear_all()
 
-    def clear_zone_runs(self, zone: IUZone) -> None:
-        """Clear out zone run queues"""
+    def clear_zone_runs(self, zone: IUZone, keep_manual: bool = False) -> None:
+        """Clear out zone run queues. Set keep_manual to spare a queued manual
+        sequence run, matching the zone queue which already keeps its manual
+        entries. Only do so when the caller has not changed which zones take
+        part in a run - an enable, disable or suspend does change that and
+        leaves an already built run stale"""
         zone.runs.clear_runs()
         for sequence in self._sequences:
             if zone in sequence.zone_list():
-                sequence.runs.clear_runs()
+                if keep_manual:
+                    sequence.clear_scheduled_runs()
+                else:
+                    sequence.runs.clear_runs()
 
     def load(self, config: OrderedDict) -> "IUController":
         """Load config data for the controller"""
@@ -5673,7 +5680,7 @@ class IUController(IUBase):
             for zone in self._zones:
                 if zone_list is None or zone.index in zone_list:
                     if zone.service_adjust_time(data, stime):
-                        self.clear_zone_runs(zone)
+                        self.clear_zone_runs(zone, keep_manual=True)
                         changed = True
         else:
             for sequence in (self.get_sequence(sqid) for sqid in sequence_list):
@@ -7630,7 +7637,7 @@ class IUCoordinator:
                 changed = sequence.service_adjust_time(data1, stime)
             elif zone is not None:
                 if changed := zone.service_adjust_time(data1, stime):
-                    controller.clear_zone_runs(zone)
+                    controller.clear_zone_runs(zone, keep_manual=True)
             else:
                 changed = controller.service_adjust_time(data1, stime)
         elif service == SERVICE_MANUAL_RUN:
