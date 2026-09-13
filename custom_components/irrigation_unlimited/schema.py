@@ -416,7 +416,7 @@ IRRIGATION_SCHEMA = vol.Schema(
 
 positive_float_template = vol.Any(cv.positive_float, cv.template)
 
-SKIP_SCHEMA = {vol.Required(CONF_ENTITY_ID): cv.entity_ids}
+SKIP_ZONE_SCHEMA = {vol.Required(CONF_ENTITY_ID): cv.entity_ids}
 
 # Absence of count/until/reset means skip the next scheduled run
 SKIP_RUN_SCHEMA = cv.make_entity_service_schema(

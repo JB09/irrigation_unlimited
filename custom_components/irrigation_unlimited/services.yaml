@@ -393,8 +393,8 @@ resume:
           max: 9999
           mode: box
 
-skip:
-  name: Skip
+skip_zone:
+  name: Skip zone
   description: Advance a running sequence to its next zone. To drop a future run see skip_run
   fields:
     entity_id:
@@ -409,7 +409,7 @@ skip:
 
 skip_run:
   name: Skip run
-  description: Waive the next scheduled run(s) of a sequence leaving the schedule intact. To advance a running sequence to its next zone see skip
+  description: Waive the next scheduled run(s) of a sequence leaving the schedule intact. To advance a running sequence to its next zone see skip_zone
   fields:
     entity_id:
       name: Entity Id
