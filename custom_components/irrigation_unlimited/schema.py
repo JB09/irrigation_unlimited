@@ -27,6 +27,7 @@ from .const import (
     CONF_CONFIG,
     CONF_CONTROLLERS,
     CONF_CONTROLLER_ID,
+    CONF_COUNT,
     CONF_CRON,
     CONF_CYCLE,
     CONF_DAY,
@@ -416,6 +417,17 @@ IRRIGATION_SCHEMA = vol.Schema(
 positive_float_template = vol.Any(cv.positive_float, cv.template)
 
 SKIP_SCHEMA = {vol.Required(CONF_ENTITY_ID): cv.entity_ids}
+
+# Absence of count/until/reset means skip the next scheduled run
+SKIP_RUN_SCHEMA = cv.make_entity_service_schema(
+    {
+        vol.Required(CONF_ENTITY_ID): cv.entity_ids,
+        vol.Exclusive(CONF_COUNT, "skip_method"): cv.positive_int,
+        vol.Exclusive(CONF_UNTIL, "skip_method"): cv.datetime,
+        vol.Exclusive(CONF_RESET, "skip_method"): None,
+        vol.Optional(CONF_SEQUENCE_ID): cv.ensure_list,
+    }
+)
 
 ENABLE_DISABLE_SCHEMA = {
     vol.Required(CONF_ENTITY_ID): cv.entity_ids,

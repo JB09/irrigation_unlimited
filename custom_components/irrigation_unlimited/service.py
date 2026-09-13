@@ -18,6 +18,7 @@ from .schema import (
     CANCEL_SCHEMA,
     ENABLE_DISABLE_SCHEMA,
     SKIP_SCHEMA,
+    SKIP_RUN_SCHEMA,
     GET_STATUS_SCHEMA,
     LOAD_SCHEDULE_SCHEMA,
     MANUAL_RUN_SCHEMA,
@@ -50,6 +51,7 @@ from .const import (
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_SKIP,
+    SERVICE_SKIP_RUN,
     SERVICE_SUSPEND,
     SERVICE_TIME_ADJUST,
     SERVICE_TOGGLE,
@@ -88,6 +90,9 @@ def register_platform_services(platform: entity_platform.EntityPlatform) -> None
     )
     platform.async_register_entity_service(
         SERVICE_SKIP, SKIP_SCHEMA, async_entity_service_handler
+    )
+    platform.async_register_entity_service(
+        SERVICE_SKIP_RUN, SKIP_RUN_SCHEMA, async_entity_service_handler
     )
 
     platform.async_register_entity_service(

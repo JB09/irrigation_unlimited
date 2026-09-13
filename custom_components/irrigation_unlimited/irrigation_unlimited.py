@@ -87,6 +87,8 @@ from .const import (
     ATTR_SCHEDULE_ID,
     ATTR_SEQUENCE,
     ATTR_SEQUENCE_ID,
+    ATTR_SKIPPED,
+    ATTR_SKIP_UNTIL,
     ATTR_START,
     ATTR_STATUS,
     ATTR_SUSPENDED,
@@ -111,6 +113,7 @@ from .const import (
     CONF_CONTROLLER,
     CONF_CONTROLLERS,
     CONF_CONTROLLER_ID,
+    CONF_COUNT,
     CONF_CRON,
     CONF_CYCLE,
     CONF_DAY,
@@ -229,6 +232,7 @@ from .const import (
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_SKIP,
+    SERVICE_SKIP_RUN,
     SERVICE_SUSPEND,
     SERVICE_TIME_ADJUST,
     SERVICE_TOGGLE,
@@ -3876,12 +3880,13 @@ class IUSequenceQueue(list[IUSequenceRun]):
         self._current_run = None
         super().clear()
 
-    def clear_runs(self) -> bool:
-        """Clear out future schedules."""
+    def clear_runs(self, test: Callable[[IUSequenceRun], bool] = None) -> bool:
+        """Clear out future schedules. When test is supplied only the runs
+        it accepts are removed"""
         modified = False
         i = len(self) - 1
         while i >= 0:
-            if (sqr := self[i]).future:
+            if (sqr := self[i]).future and (test is None or test(sqr)):
                 for run in sqr.runs:
                     run.zone.runs.remove_run(run)
                     run.zone.request_update()
@@ -4018,6 +4023,8 @@ class IUSequence(IUBase):
         self._zones: list[IUSequenceZone] = []
         self._adjustment = IUAdjustment()
         self._suspend_until: datetime = None
+        self._skipped_runs: dict[datetime, datetime] = {}
+        self._skip_until: datetime = None
         self._sensor_update_required: bool = False
         self._sensor_last_update: datetime = None
         self._initialised: bool = False
@@ -4166,6 +4173,17 @@ class IUSequence(IUBase):
             self._suspend_until = value
             self._dirty = True
             self.request_update()
+
+    @property
+    def skipped(self) -> list[datetime]:
+        """Return the start times of the scheduled runs which have been
+        waived. Sorted and in UTC"""
+        return sorted(self._skipped_runs)
+
+    @property
+    def skip_until(self) -> datetime:
+        """Return the date before which every scheduled run is waived"""
+        return self._skip_until
 
     @property
     def adjustment(self) -> IUAdjustment:
@@ -4452,6 +4470,8 @@ class IUSequence(IUBase):
         result[CONF_STATE] = STATE_ON if self.is_on else STATE_OFF
         result[CONF_ENABLED] = self._enabled
         result[ATTR_SUSPENDED] = self.suspended
+        result[ATTR_SKIPPED] = self.skipped
+        result[ATTR_SKIP_UNTIL] = self.skip_until
         result[ATTR_ADJUSTMENT] = str(self._adjustment)
         result[CONF_SEQUENCE_ZONES] = [
             szn.as_dict(duration_factor, extended) for szn in self._zones
@@ -4484,6 +4504,11 @@ class IUSequence(IUBase):
         if self._suspend_until is not None and stime >= self._suspend_until:
             self._suspend_until = None
             status |= IURQStatus.CHANGED
+
+        # An expired skip record can not bring back a run so there is
+        # nothing to rebuild, only the sensor needs a refresh
+        if self.prune_skipped(stime):
+            self.request_update()
 
         for sequence_zone in self._zones:
             status |= sequence_zone.muster(stime)
@@ -4556,7 +4581,10 @@ class IUSequence(IUBase):
     def next_awakening(self) -> datetime:
         """Return the next event time"""
         return IUDTMin(
-            self._suspend_until, (sqz.next_awakening() for sqz in self._zones)
+            self._suspend_until,
+            self._skip_until,
+            self._skipped_runs.values(),
+            (sqz.next_awakening() for sqz in self._zones),
         ).min
 
     def finalise(self) -> None:
@@ -4645,6 +4673,102 @@ class IUSequence(IUBase):
             if sqr.running:
                 sqr.cancel(stime)
                 changed = True
+        return changed
+
+    def is_run_skipped(self, start_time: datetime, end_time: datetime) -> bool:
+        """Return True if a run starting at start_time has been waived. A run
+        caught by the skip_until cut off is recorded here so it remains waived
+        after the cut off has passed and its window is still open"""
+        if start_time in self._skipped_runs:
+            return True
+        if self._skip_until is not None and start_time < self._skip_until:
+            self._skipped_runs[start_time] = end_time
+            return True
+        return False
+
+    def prune_skipped(self, stime: datetime) -> bool:
+        """Discard the skip records which can no longer suppress a run. A run
+        is not regenerated once its window has closed"""
+        changed = False
+        for start_time in [
+            start for start, end in self._skipped_runs.items() if stime >= end
+        ]:
+            del self._skipped_runs[start_time]
+            changed = True
+        if self._skip_until is not None and stime >= self._skip_until:
+            self._skip_until = None
+            changed = True
+        return changed
+
+    def _clear_scheduled_runs(self) -> bool:
+        """Drop the future scheduled runs so the next muster rebuilds them
+        honouring the skips. Manual runs are never skipped so leave them be"""
+        return self._run_queue.clear_runs(lambda sqr: not sqr.is_manual())
+
+    def _skip_queued_runs(self, count: int, until: datetime) -> bool:
+        """Record the start times of the upcoming scheduled runs. Take the
+        first count runs or those starting before until"""
+        changed = False
+        for sqr in sorted(
+            (sqr for sqr in self._run_queue if sqr.future and not sqr.is_manual()),
+            key=lambda sqr: sqr.start_time,
+        ):
+            if count is not None and count <= 0:
+                break
+            if until is not None and sqr.start_time >= until:
+                break
+            if sqr.start_time not in self._skipped_runs:
+                self._skipped_runs[sqr.start_time] = sqr.end_time
+                changed = True
+            if count is not None:
+                count -= 1
+        return changed
+
+    def service_skip_run(self, data: MappingProxyType, stime: datetime) -> bool:
+        """Service handler for skip_run. Waive the next scheduled run(s)
+        without disturbing the schedule itself"""
+        changed = False
+        if CONF_RESET in data:
+            if self._skipped_runs or self._skip_until is not None:
+                self._skipped_runs.clear()
+                self._skip_until = None
+                changed = True
+        elif CONF_UNTIL in data:
+            until = wash_dt(dt.as_utc(data[CONF_UNTIL]))
+            if until > stime and until != self._skip_until:
+                self._skip_until = until
+                changed = True
+            changed |= self._skip_queued_runs(None, until)
+        else:
+            changed |= self._skip_queued_runs(data.get(CONF_COUNT, 1), None)
+        if changed:
+            self._clear_scheduled_runs()
+            self.request_update()
+        return changed
+
+    def restore_skipped(self, skipped: list[datetime], skip_until: datetime) -> bool:
+        """Reinstate the skip records saved before a restart. Unlike the
+        service call this replaces rather than adds to the current state"""
+
+        def longest_run() -> timedelta:
+            """The window a restored run could still occupy. Only the start
+            times are saved so take the longest the sequence could run for"""
+            span = self.total_time_final(None, None)
+            for schedule in self._schedules:
+                if schedule.duration is not None:
+                    span = max(span, schedule.duration)
+            return span
+
+        runs = dict(self._skipped_runs)
+        span = longest_run()
+        starts = [wash_dt(start) for start in skipped if start is not None]
+        self._skipped_runs = {start: runs.get(start, start + span) for start in starts}
+        skip_until = wash_dt(skip_until)
+        changed = self._skipped_runs != runs or skip_until != self._skip_until
+        self._skip_until = skip_until
+        if changed:
+            self._clear_scheduled_runs()
+            self.request_update()
         return changed
 
     def service_skip(self, data: MappingProxyType, stime: datetime) -> bool:
@@ -5167,9 +5291,24 @@ class IUController(IUBase):
 
         total_time = sequence_run.build(duration_factor)
         if total_time > TD_ZERO:
+            first_zone = sequence_run.first_zone()
             start_time = init_run_time(
-                earliest, sequence, schedule, sequence_run.first_zone(), total_time
+                earliest, sequence, schedule, first_zone, total_time
             )
+            # Step over any run waived by the skip_run service. Search from the
+            # end of the waived run, exactly as the normal chaining does, so
+            # the following occurrence is returned rather than this one again
+            while (
+                schedule is not None
+                and start_time is not None
+                and sequence.is_run_skipped(start_time, start_time + total_time)
+            ):
+                start_time = schedule.get_next_run(
+                    start_time + total_time,
+                    first_zone.runs.last_time(stime),
+                    total_time,
+                    False,
+                )
             if start_time is not None:
                 sequence_run.allocate_runs(stime, start_time)
                 sequence.runs.add(sequence_run)
@@ -5507,6 +5646,20 @@ class IUController(IUBase):
                 changed |= sequence.service_suspend(data, stime)
             if changed:
                 self.request_update(True)
+        return changed
+
+    def service_skip_run(self, data: MappingProxyType, stime: datetime) -> bool:
+        """Handler for the skip_run service call. Unlike suspend there is no
+        controller wide equivalent so a sequence must be nominated"""
+        changed = False
+        sequence_list = self.decode_sequence_id(stime, data.get(CONF_SEQUENCE_ID))
+        if sequence_list is None:
+            self._coordinator.logger.log_sequence_required(stime)
+            return False
+        for sequence in (self.get_sequence(sqid) for sqid in sequence_list):
+            changed |= sequence.service_skip_run(data, stime)
+        if changed:
+            self.request_update(True)
         return changed
 
     def service_adjust_time(self, data: MappingProxyType, stime: datetime) -> bool:
@@ -6239,6 +6392,10 @@ class IULogger:
         """Warn that a service call involved a sequence but was not directed
         at the controller"""
         self._format(level, "ENTITY", vtime, "Sequence specified but entity_id is zone")
+
+    def log_sequence_required(self, vtime: datetime, level=WARNING) -> None:
+        """Warn that a service call must nominate a sequence"""
+        self._format(level, "ENTITY", vtime, "Service call requires a sequence")
 
     def log_invalid_zone(
         self,
@@ -7486,6 +7643,13 @@ class IUCoordinator:
         elif service == SERVICE_SKIP:
             if sequence is not None:
                 changed = sequence.service_skip(data1, stime)
+        elif service == SERVICE_SKIP_RUN:
+            if sequence is not None:
+                changed = sequence.service_skip_run(data1, stime)
+            elif zone is not None:
+                self._logger.log_sequence_required(stime)
+            else:
+                changed = controller.service_skip_run(data1, stime)
         elif service == SERVICE_PAUSE:
             if sequence is not None:
                 changed = sequence.service_pause(data1, stime)
