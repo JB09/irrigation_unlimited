@@ -53,11 +53,13 @@
   - [7.2. Actions `pause` and `resume`](#72-actions-pause-and-resume)
   - [7.3. Action `suspend`](#73-action-suspend)
   - [7.4. Action `cancel`](#74-action-cancel)
-  - [7.5. Action `manual_run`](#75-action-manual_run)
-  - [7.6. Action `adjust_time`](#76-action-adjust_time)
-  - [7.7. Action `load_schedule`](#77-action-load_schedule)
-  - [7.8. Action `reload`](#78-action-reload)
-  - [7.9. Action call access roadmap](#79-action-call-access-roadmap)
+  - [7.5. Action `skip`](#75-action-skip)
+  - [7.6. Action `skip_run`](#76-action-skip_run)
+  - [7.7. Action `manual_run`](#77-action-manual_run)
+  - [7.8. Action `adjust_time`](#78-action-adjust_time)
+  - [7.9. Action `load_schedule`](#79-action-load_schedule)
+  - [7.10. Action `reload`](#710-action-reload)
+  - [7.11. Action call access roadmap](#711-action-call-access-roadmap)
 - [8. Frontend](#8-frontend)
   - [8.1. Generic Cards](#81-generic-cards)
   - [8.2. Timeline](#82-timeline)
@@ -410,7 +412,7 @@ sequences:
 
 Notes:
 
-- The per-cycle split is **re-derived from the zone's total whenever that total changes**, including via the [`adjust_time`](#76-action-adjust_time) action. This makes cycle-and-soak compose cleanly with integrations such as Smart Irrigation that push a *total* daily run time per zone — there is no need to pre-divide by a repeat count. Use `adjust_time` with `actual` (and the `zones` parameter to target a position within the sequence) to set a zone's new total; the cycles are recalculated on the next run.
+- The per-cycle split is **re-derived from the zone's total whenever that total changes**, including via the [`adjust_time`](#78-action-adjust_time) action. This makes cycle-and-soak compose cleanly with integrations such as Smart Irrigation that push a *total* daily run time per zone — there is no need to pre-divide by a repeat count. Use `adjust_time` with `actual` (and the `zones` parameter to target a position within the sequence) to set a zone's new total; the cycles are recalculated on the next run.
 - `cycle` is **mutually exclusive with `repeat`**. When `repeat` is greater than 1 the `cycle` block is ignored.
 - Because of the soak windows, a cycle-and-soak sequence occupies a longer wall-clock window than the sum of its run times.
 - The `cycle` block can be set at the **sequence level** (applies to every zone) and/or on an **individual sequence zone**. A zone-level `cycle` overrides the sequence-level values **per field** — e.g. a zone can set its own `max_duration` (a different runoff threshold) while inheriting `min_duration` and `min_soak` from the sequence. A sequence with cycle blocks only on its zones (no sequence-level `cycle`) still enables cycle-and-soak. This is fully backwards compatible: a config with only a sequence-level `cycle` behaves exactly as before.
@@ -832,6 +834,8 @@ The binary sensor associated with each controller and zone provide several servi
 - `toggle`
 - `suspend`
 - `cancel`
+- `skip`
+- `skip_run`
 - `manual_run`
 - `adjust_time`
 - `load_schedule`
@@ -884,7 +888,48 @@ Cancels the current running schedule.
 | ---------------------- | ---- | -------- | ----------- |
 | `entity_id` | [string/list](#141-irrigation-unlimited-entities) | yes | Controller or zone to cancel. |
 
-### 7.5. Action `manual_run`
+### 7.5. Action `skip`
+
+Advance a *running* sequence to its next zone. The remainder of the current zone is abandoned and the sequence carries on from the following one. This does not touch the schedule. To drop a run which has not started yet see [`skip_run`](#76-action-skip_run).
+
+| Service data attribute | Type | Required | Description |
+| ---------------------- | ---- | -------- | ----------- |
+| `entity_id` | [string/list](#141-irrigation-unlimited-entities) | yes | Sequence to advance. |
+
+### 7.6. Action `skip_run`
+
+Waive the next scheduled run(s) of a sequence. The schedule itself is left completely alone, as are `enabled`, `suspended` and any adjustments, so later runs go ahead as normal. Use this for a one off "not today" without the arithmetic that [`suspend`](#73-action-suspend) requires - there is no window for the caller to size and no risk of a run restarting late and truncated when the suspension lifts part way through it.
+
+Only runs which have not started are candidates. A run already in progress is untouched; use [`cancel`](#74-action-cancel) for that. Manual runs are never skipped.
+
+Waived runs survive a restart and are listed in the sequence entity's `skipped` attribute. Each record is dropped once its run can no longer be built.
+
+| Service data attribute | Type | Required | Description |
+| ---------------------- | ---- | -------- | ----------- |
+| `entity_id` | [string/list](#141-irrigation-unlimited-entities) | yes | Sequence to skip. May also be a controller, in which case `sequence_id` is required. |
+| `sequence_id` | [number/list](#145-sequence) | only if entity_id represents a controller | Sequences to skip. If set to 0 then all sequences of the controller are effected. |
+| `count` | number | see below* | The number of scheduled runs to waive. Defaults to 1. |
+| `until` | string | see below* | Waive every scheduled run starting before this point in time. Format is `%Y-%m-%d %H:%M:%S` for example `2023-08-01 07:30:00`. |
+| `reset` | none | see below* | Reinstate all the waived runs. |
+
+\* At most one of `count`, `until` or `reset`. With none of them the next scheduled run is waived.
+
+Skip today's 10:30 pass of a sequence:
+
+```yaml
+- action: irrigation_unlimited.skip_run
+  data:
+    entity_id: binary_sensor.irrigation_unlimited_c1_s4
+```
+
+Calls accumulate, so two calls of `count: 1` waive two runs. Shrinking a previous `until` does not reinstate anything - use `reset` and skip again.
+
+Notes:
+
+- `count` works from the runs already built out, which reach `future_span` days ahead (3 by default). To waive runs further out than that use `until`, which has no such limit.
+- A waived run is matched on its start time. Changing the duration or the `anchor` of a schedule with [`adjust_time`](#78-action-adjust_time) *after* skipping may move that start and let the run go ahead. Skip after adjusting, not before.
+
+### 7.7. Action `manual_run`
 
 Turn on the controller or zone for a period of time. When a sequence is specified each zone's duration will be auto adjusted as a proportion of the original sequence. Zone times are calculated and rounded to the nearest time boundary. This means the total run time may vary from the specified time.
 
@@ -896,7 +941,7 @@ Turn on the controller or zone for a period of time. When a sequence is specifie
 | `queue` | boolean | no | Queue or run immediately. |
 | `sequence_id` | [number/list](#145-sequence) | no | Sequences to run. Each zone duration will be adjusted to fit the allocated time, delays are not effected. Note: The time parameter _includes_ inter zone delays. If the total delays are greater than the specified time then the sequence will not run. Entity must be a controller. |
 
-### 7.6. Action `adjust_time`
+### 7.8. Action `adjust_time`
 
 Adjust the run times. Calling this service will override any previous adjustment i.e. it will _not_ make adjustments on adjustments. For example, if the scheduled duration is 30 minutes calling percent: 150 will make it 45 minutes then calling percent 200 will make it 60 minutes. When a sequence is specified each zone's duration will be auto adjusted as a proportion of the original sequence.
 
@@ -919,7 +964,7 @@ Tip: Use forecast and observation data collected by weather integrations in auto
 
 \* Must have one and only one of `actual`, `percentage`, `increase`, `decrease` or `reset`.
 
-### 7.7. Action `load_schedule`
+### 7.9. Action `load_schedule`
 
 Reload a schedule. This will allow an edit to an existing schedule. All fields are optional except the `schedule_id`. If a field is specified then it is overwritten otherwise it is left untouched. This service does NOT save the new schedule in the event of a reload or HA restart, it will revert to the original configuration.
 
@@ -935,11 +980,11 @@ Reload a schedule. This will allow an edit to an existing schedule. All fields a
 | `month` | list | | Months of year to run [jan, feb...dec] |
 | `enabled` | bool | | Enable/disable the schedule |
 
-### 7.8. Action `reload`
+### 7.10. Action `reload`
 
 Reload the YAML configuration file. Do not add or delete controllers or zones, they will not work because of the associated entities which are created on startup. This may be addressed in a future release, however, suggested work around is to set enabled to false to effectively disable/delete. All other settings can be changed including schedules. You will find the control in Configuration -> Server Controls -> YAML configuration reloading. Note: since version 2021.10.0 all settings can be changed including new controllers and zones.
 
-### 7.9. Action call access roadmap
+### 7.11. Action call access roadmap
 
 A reminder that sequences directly descend from a controller. Therefore service calls that manipulate a sequence should address the parent controller. An entity_id of a zone when trying to adjust a sequence will most likely not have the desired effect.
 

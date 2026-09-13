@@ -1,6 +1,7 @@
 """HA entity classes"""
 
 import json
+from datetime import datetime
 from collections.abc import Iterator
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import ServiceCall, ServiceResponse
@@ -30,6 +31,8 @@ from .const import (
     ATTR_CONTROLLER_COUNT,
     ATTR_ENABLED,
     ATTR_NEXT_TICK,
+    ATTR_SKIPPED,
+    ATTR_SKIP_UNTIL,
     ATTR_TICK_LOG,
     ATTR_SUSPENDED,
     ATTR_ZONES,
@@ -53,6 +56,16 @@ from .const import (
     SERVICE_SUSPEND,
     STATUS_INITIALISING,
 )
+
+
+def as_utc(value: datetime | str | None) -> datetime | None:
+    """Convert a saved attribute to UTC. Values are datetimes while in
+    memory and ISO strings once they have been through a restart"""
+    if isinstance(value, str):
+        value = dt.parse_datetime(value)
+    if value is None:
+        return None
+    return dt.as_utc(value)
 
 
 class IURestore:
@@ -174,6 +187,16 @@ class IURestore:
                 svd[CONF_ZONES] = [sequence_zone.index + 1]
         self._coordinator.service_call(SERVICE_SUSPEND, controller, zone, None, svd)
 
+    def _restore_skipped(self, data: dict, sequence: IUSequence) -> None:
+        """Reinstate the waived runs. This goes direct to the sequence as
+        there is no service call which sets the skips verbatim"""
+        if ATTR_SKIPPED not in data and ATTR_SKIP_UNTIL not in data:
+            return
+        sequence.restore_skipped(
+            [as_utc(item) for item in data.get(ATTR_SKIPPED, [])],
+            as_utc(data.get(ATTR_SKIP_UNTIL)),
+        )
+
     def _restore_adjustment(
         self,
         data: dict,
@@ -209,6 +232,7 @@ class IURestore:
         self._restore_enabled(data, controller, None, sequence, None)
         self._restore_suspend(data, controller, None, sequence, None)
         self._restore_adjustment(data, controller, None, sequence, None)
+        self._restore_skipped(data, sequence)
         for sz_data in data.get(CONF_SEQUENCE_ZONES, []):
             self._restore_sequence_zone(sz_data, controller, sequence)
         self._check_is_on(data, controller, None, sequence, None)
@@ -303,6 +327,14 @@ class IUEntity(BinarySensorEntity, RestoreEntity):
             _append_zone(svd, zone)
             self._call_iu(SERVICE_TIME_ADJUST, svd)
 
+        def _restore_skipped(attr: dict) -> None:
+            if ATTR_SKIPPED not in attr and ATTR_SKIP_UNTIL not in attr:
+                return
+            self._sequence.restore_skipped(
+                [as_utc(item) for item in attr.get(ATTR_SKIPPED, [])],
+                as_utc(attr.get(ATTR_SKIP_UNTIL)),
+            )
+
         def _check_is_on(state: str) -> None:
             if state == "on":
                 self._coordinator.logger.log_incomplete_cycle(
@@ -316,6 +348,8 @@ class IUEntity(BinarySensorEntity, RestoreEntity):
         _restore_enabled(state.attributes)
         _restore_suspend(state.attributes)
         _restore_adjustment(state.attributes)
+        if self._sequence is not None:
+            _restore_skipped(state.attributes)
         if self._sequence is not None and state.attributes.get(ATTR_ZONES) is not None:
             for index, zone in enumerate(state.attributes[ATTR_ZONES]):
                 _restore_enabled(zone, index + 1)

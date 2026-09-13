@@ -68,6 +68,8 @@ async def test_get_status_basic(
                             "state": "off",
                             "enabled": True,
                             "suspended": None,
+                            "skipped": [],
+                            "skip_until": None,
                             "adjustment": "",
                             "sequence_zones": [
                                 {
@@ -151,6 +153,8 @@ async def test_get_status_basic(
                             "state": "on",
                             "enabled": True,
                             "suspended": None,
+                            "skipped": [],
+                            "skip_until": None,
                             "adjustment": "",
                             "sequence_zones": [
                                 {
@@ -283,6 +287,8 @@ async def test_get_status_extended(
                             "state": "off",
                             "enabled": True,
                             "suspended": None,
+                            "skipped": [],
+                            "skip_until": None,
                             "adjustment": "",
                             "icon": "mdi:stop-circle-outline",
                             "status": "off",
@@ -439,6 +445,8 @@ async def test_get_status_extended(
                             "state": "on",
                             "enabled": True,
                             "suspended": None,
+                            "skipped": [],
+                            "skip_until": None,
                             "adjustment": "",
                             "sequence_zones": [
                                 {

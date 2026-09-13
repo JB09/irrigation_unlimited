@@ -393,6 +393,70 @@ resume:
           max: 9999
           mode: box
 
+skip:
+  name: Skip
+  description: Advance a running sequence to its next zone. To drop a future run see skip_run
+  fields:
+    entity_id:
+      name: Entity Id
+      description: Name of the Irrigation Unlimited sequence entity.
+      example: "binary_sensor.irrigation_unlimited_c1_s1"
+      required: true
+      selector:
+        entity:
+          integration: irrigation_unlimited
+          domain: binary_sensor
+
+skip_run:
+  name: Skip run
+  description: Waive the next scheduled run(s) of a sequence leaving the schedule intact. To advance a running sequence to its next zone see skip
+  fields:
+    entity_id:
+      name: Entity Id
+      description: Name of the Irrigation Unlimited controller or sequence entity.
+      example: "binary_sensor.irrigation_unlimited_c1_s1"
+      required: true
+      selector:
+        entity:
+          integration: irrigation_unlimited
+          domain: binary_sensor
+
+    sequence_id:
+      name: Sequence Id
+      description: Used when entity_id is the controller. Id of the sequence to skip (0=all sequences).
+      example: 1
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 9999
+          mode: box
+
+    count:
+      name: Count
+      description: The number of scheduled runs to waive (default 1)
+      example: 1
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 9999
+          mode: box
+
+    until:
+      name: Until
+      description: Waive every scheduled run starting before this date and time
+      example: "2023-01-01 10:00"
+      required: false
+      selector:
+        datetime:
+
+    reset:
+      name: Reset
+      description: Reinstate all the waived runs
+      example: ""
+      required: false
+
 reload:
   name: Reload
   description: Reload the configuration

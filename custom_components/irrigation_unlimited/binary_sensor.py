@@ -39,6 +39,8 @@ from .const import (
     ATTR_ADJUSTMENT,
     ATTR_CONFIGURATION,
     ATTR_TIMELINE,
+    ATTR_SKIPPED,
+    ATTR_SKIP_UNTIL,
     ATTR_SUSPENDED,
     BINARY_SENSOR,
     DOMAIN,
@@ -359,6 +361,12 @@ class IUSequenceEntity(IUEntity):
         attr[ATTR_ENABLED] = self._sequence.enabled
         attr[ATTR_SUSPENDED] = (
             dt.as_local(self._sequence.suspended) if self._sequence.suspended else None
+        )
+        attr[ATTR_SKIPPED] = [dt.as_local(item) for item in self._sequence.skipped]
+        attr[ATTR_SKIP_UNTIL] = (
+            dt.as_local(self._sequence.skip_until)
+            if self._sequence.skip_until
+            else None
         )
         attr[ATTR_STATUS] = self._sequence.status
         attr[ATTR_ZONE_COUNT] = len(self._sequence.zones)
