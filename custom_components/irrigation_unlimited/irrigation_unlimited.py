@@ -4646,7 +4646,7 @@ class IUSequence(IUBase):
                 if check_item(sequence_zone.index, zone_list):
                     changed |= sequence_zone.adjustment.load(data)
         if changed:
-            self._run_queue.clear_runs()
+            self.clear_scheduled_runs()
         return changed
 
     def service_manual_run(self, data: MappingProxyType, stime: datetime) -> bool:
@@ -4700,9 +4700,10 @@ class IUSequence(IUBase):
             changed = True
         return changed
 
-    def _clear_scheduled_runs(self) -> bool:
-        """Drop the future scheduled runs so the next muster rebuilds them
-        honouring the skips. Manual runs are never skipped so leave them be"""
+    def clear_scheduled_runs(self) -> bool:
+        """Drop the future scheduled runs so the next muster rebuilds them.
+        A queued manual run is not derived from a schedule and can not be
+        rebuilt, so leave it alone"""
         return self._run_queue.clear_runs(lambda sqr: not sqr.is_manual())
 
     def _skip_queued_runs(self, count: int, until: datetime) -> bool:
@@ -4742,7 +4743,7 @@ class IUSequence(IUBase):
         else:
             changed |= self._skip_queued_runs(data.get(CONF_COUNT, 1), None)
         if changed:
-            self._clear_scheduled_runs()
+            self.clear_scheduled_runs()
             self.request_update()
         return changed
 
@@ -4767,7 +4768,7 @@ class IUSequence(IUBase):
         changed = self._skipped_runs != runs or skip_until != self._skip_until
         self._skip_until = skip_until
         if changed:
-            self._clear_scheduled_runs()
+            self.clear_scheduled_runs()
             self.request_update()
         return changed
 
@@ -4834,7 +4835,7 @@ class IUSequence(IUBase):
                     sqz.repeat = data.get(CONF_REPEAT, sqz.repeat)
                     changed = True
         if changed:
-            self._run_queue.clear_runs()
+            self.clear_scheduled_runs()
         return changed
 
 
@@ -7573,7 +7574,7 @@ class IUCoordinator:
                 for schedule in sequence.schedules:
                     if schedule.schedule_id == data[CONF_SCHEDULE_ID]:
                         schedule.load(data, True)
-                        sequence.runs.clear_runs()
+                        sequence.clear_scheduled_runs()
                         return True
         return False
 
