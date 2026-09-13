@@ -1458,8 +1458,10 @@ async def test_volume_fault(hass: ha.HomeAssistant, skip_dependencies, skip_hist
                     yield (op, dts, adjustment, volume)
 
     def event_sorter(item: dict):
-        """Sort by time"""
-        return item["event_time"]
+        """Sort by time, then type and id. Events raised in the same tick
+        share a time, so sorting on that alone leaves their order down to
+        the dispatch order and the comparison below intermittently fails"""
+        return (item["event_time"], item["event_type"], item["data"]["iu_id"])
 
     async with IUExam(hass, "test_volume_fault.yaml") as exam:
         await exam.load_component("input_text")
@@ -1493,8 +1495,7 @@ async def test_volume_fault(hass: ha.HomeAssistant, skip_dependencies, skip_hist
                     "data": event.data,
                 }
             )
-            sta = hass.states.get(event.data["entity_id"])
-            sequence_volumes.append(sta.attributes["volume"])
+            sequence_volumes.append(event.data["volume"])
 
         hass.bus.async_listen(f"{DOMAIN}_{EVENT_FINISH}", handle_finish_event)
 
@@ -1545,7 +1546,23 @@ async def test_volume_fault(hass: ha.HomeAssistant, skip_dependencies, skip_hist
         assert controller_flows == [239.136, 321.705]
         assert zone_volumes == [20.475, 125.644, 1.34]
         assert zone_flows == [1.113, 6.828, 1.608]
-        assert sequence_volumes == [143.263, 1.34]
+        assert sequence_volumes == [146.119, 1.34]
+
+        # The entity attributes settle on the figures the events carried.
+        # Reading them inside the event handler above would race the state
+        # write and see whatever the previous reading left behind
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_s1").attributes[
+                "volume"
+            ]
+            == 1.34
+        )
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_s2").attributes[
+                "volume"
+            ]
+            == 146.119
+        )
 
         await exam.finish_test()
 
@@ -1838,7 +1855,9 @@ async def test_volume_limit(hass: ha.HomeAssistant, skip_dependencies, skip_hist
 
         exam.check_summary()
 
-        event_data.sort(key=lambda x: x["event_time"])
+        event_data.sort(
+            key=lambda x: (x["event_time"], x["event_type"], x["data"]["iu_id"])
+        )
         assert event_data == [
             {
                 "event_type": "irrigation_unlimited_valve_off",
