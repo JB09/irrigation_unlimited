@@ -3,11 +3,11 @@ import re
 
 
 def split_iu_entity(entity_id) -> list:
-  if entity_id is not None:
-    l = re.split(r"^(\d+)\.(\d+)\s(.*)$", state.get(entity_id))
-    if len(l) == 5:
-        return l
-    return None
+    if entity_id is not None:
+        l = re.split(r"^(\d+)\.(\d+)\s(.*)$", state.get(entity_id))
+        if len(l) == 5:
+            return l
+        return None
 
 
 def convert_iu_entity(entity_id) -> str:
@@ -33,7 +33,7 @@ def convert_iu_sequence(entity_id) -> list:
 def convert_iu_sequence_zone(entity_id) -> list:
     value = state.get(entity_id)
     if value is not None:
-        l = value.split(',')
+        l = value.split(",")
         if len(l) == 1:
             try:
                 value = [int(l[0])]
@@ -47,8 +47,11 @@ def convert_iu_sequence_zone(entity_id) -> list:
             value = None
     return value
 
+
 @service("irrigation_unlimited.list_config")
-def irrigation_unlimited_list_config(entity_id, section, first=None, controller_sequence_entity=None):
+def irrigation_unlimited_list_config(
+    entity_id, section, first=None, controller_sequence_entity=None
+):
     """yaml
     name: List configuration
     description: Load up an input_select entity with Irrigation Unlimited config data
@@ -110,9 +113,9 @@ def irrigation_unlimited_list_config(entity_id, section, first=None, controller_
                 controller_id = int(l[1])
                 sequence_id = int(l[2])
                 for controller in data.get("controllers"):
-                    if controller['index'] + 1 == controller_id:
+                    if controller["index"] + 1 == controller_id:
                         for sequence in controller["sequences"]:
-                            if sequence['index'] + 1 == sequence_id:
+                            if sequence["index"] + 1 == sequence_id:
                                 for sequence_zone in sequence["zones"]:
                                     options.append(f"{sequence_zone['index'] + 1}")
             else:
@@ -193,7 +196,11 @@ def irrigation_unlimited_call_cancel(controller_zone_entity):
 
 
 @service("irrigation_unlimited.shim_enable")
-def irrigation_unlimited_call_enable(controller_zone_entity=None, controller_sequence_entity=None, sequence_zone_entity=None):
+def irrigation_unlimited_call_enable(
+    controller_zone_entity=None,
+    controller_sequence_entity=None,
+    sequence_zone_entity=None,
+):
     """yaml
     name: Enable shim
     description: Decode the arguments and run the Irrigation Unlimited enable service
@@ -234,17 +241,21 @@ def irrigation_unlimited_call_enable(controller_zone_entity=None, controller_seq
         if sequence_id is None:
             irrigation_unlimited.enable(entity_id=entity_id)
         elif zones is None:
-            irrigation_unlimited.enable(
-                entity_id=entity_id, sequence_id=sequence_id
-            )
+            irrigation_unlimited.enable(entity_id=entity_id, sequence_id=sequence_id)
         else:
-            irrigation_unlimited.enable(entity_id=entity_id, sequence_id=sequence_id, zones=zones)
+            irrigation_unlimited.enable(
+                entity_id=entity_id, sequence_id=sequence_id, zones=zones
+            )
     else:
         log.warning("invalid parameters")
 
 
 @service("irrigation_unlimited.shim_disable")
-def irrigation_unlimited_call_disable(controller_zone_entity=None, controller_sequence_entity=None, sequence_zone_entity=None):
+def irrigation_unlimited_call_disable(
+    controller_zone_entity=None,
+    controller_sequence_entity=None,
+    sequence_zone_entity=None,
+):
     """yaml
     name: Disable shim
     description: Decode the arguments and run the Irrigation Unlimited disable service
@@ -281,18 +292,20 @@ def irrigation_unlimited_call_disable(controller_zone_entity=None, controller_se
             sequence_id = l[1]
             zones = convert_iu_sequence_zone(sequence_zone_entity)
     if entity_id is not None:
-        log.warning(f"entity_id: {entity_id}, sequence_id: {sequence_id}, zones: {zones}")
+        log.warning(
+            f"entity_id: {entity_id}, sequence_id: {sequence_id}, zones: {zones}"
+        )
         if sequence_id is None:
             log.warning(f"calling disable - controller/zone")
             irrigation_unlimited.disable(entity_id=entity_id)
         elif zones is None:
             log.warning(f"calling disable - controller/sequence")
-            irrigation_unlimited.disable(
-                entity_id=entity_id, sequence_id=sequence_id
-            )
+            irrigation_unlimited.disable(entity_id=entity_id, sequence_id=sequence_id)
         else:
             log.warning(f"calling disable - controller/sequence/zone")
-            irrigation_unlimited.disable(entity_id=entity_id, sequence_id=sequence_id, zones=zones)
+            irrigation_unlimited.disable(
+                entity_id=entity_id, sequence_id=sequence_id, zones=zones
+            )
     else:
         log.warning("invalid parameters")
 

@@ -1,4 +1,5 @@
 """irrigation_unlimited model test template"""
+
 import homeassistant.core as ha
 from custom_components.irrigation_unlimited.const import (
     SERVICE_DISABLE,

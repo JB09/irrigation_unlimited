@@ -1,4 +1,5 @@
 """irrigation_unlimited service enable/disable/toggle tester"""
+
 from unittest.mock import patch
 import json
 import homeassistant.core as ha
@@ -197,8 +198,8 @@ async def test_service_sequence_enable_disable_by_controller(
             data = json.loads(sta.attributes["configuration"])
             assert data["controllers"][0]["sequences"][0]["enabled"] is False
             assert data["controllers"][0]["sequences"][1]["enabled"] is False
-        exam.check_iu_entity('c1_s1', "off", {"enabled": False})
-        exam.check_iu_entity('c1_s2', "off", {"enabled": False})
+        exam.check_iu_entity("c1_s1", "off", {"enabled": False})
+        exam.check_iu_entity("c1_s2", "off", {"enabled": False})
         await exam.finish_test()
 
         # Enable all sequences
@@ -215,8 +216,8 @@ async def test_service_sequence_enable_disable_by_controller(
             data = json.loads(sta.attributes["configuration"])
             assert data["controllers"][0]["sequences"][0]["enabled"] is True
             assert data["controllers"][0]["sequences"][1]["enabled"] is True
-        exam.check_iu_entity('c1_s1', "off", {"enabled": True})
-        exam.check_iu_entity('c1_s2', "off", {"enabled": True})
+        exam.check_iu_entity("c1_s1", "off", {"enabled": True})
+        exam.check_iu_entity("c1_s2", "off", {"enabled": True})
         await exam.finish_test()
 
         # Disable non existant sequence
@@ -404,8 +405,8 @@ async def test_service_sequence_enable_disable_by_sequence(
             data = json.loads(sta.attributes["configuration"])
             assert data["controllers"][0]["sequences"][0]["enabled"] is False
             assert data["controllers"][0]["sequences"][1]["enabled"] is False
-        exam.check_iu_entity('c1_s1', "off", {"enabled": False})
-        exam.check_iu_entity('c1_s2', "off", {"enabled": False})
+        exam.check_iu_entity("c1_s1", "off", {"enabled": False})
+        exam.check_iu_entity("c1_s2", "off", {"enabled": False})
         await exam.finish_test()
 
         # Enable all sequences
@@ -422,8 +423,8 @@ async def test_service_sequence_enable_disable_by_sequence(
             data = json.loads(sta.attributes["configuration"])
             assert data["controllers"][0]["sequences"][0]["enabled"] is True
             assert data["controllers"][0]["sequences"][1]["enabled"] is True
-        exam.check_iu_entity('c1_s1', "off", {"enabled": True})
-        exam.check_iu_entity('c1_s2', "off", {"enabled": True})
+        exam.check_iu_entity("c1_s1", "off", {"enabled": True})
+        exam.check_iu_entity("c1_s2", "off", {"enabled": True})
         await exam.finish_test()
 
         # Disable non existant sequence

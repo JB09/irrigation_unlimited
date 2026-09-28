@@ -86,7 +86,12 @@ async def test_helpers(hass: ha.HomeAssistant, skip_dependencies, skip_history):
         await exam.begin_test(1)
 
         # Initial state should be on
-        assert hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes["enabled"] is True
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes[
+                "enabled"
+            ]
+            is True
+        )
         assert hass.states.get("switch.zone_1_enabled").state == "on"
 
         # Disable zone 1
@@ -94,7 +99,12 @@ async def test_helpers(hass: ha.HomeAssistant, skip_dependencies, skip_history):
             SERVICE_DISABLE,
             {"entity_id": "binary_sensor.irrigation_unlimited_c1_z1"},
         )
-        assert hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes["enabled"] is False
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes[
+                "enabled"
+            ]
+            is False
+        )
         # assert hass.states.get("switch.zone_1_enabled").state == "off"
 
         # Reenable zone 1
@@ -102,21 +112,38 @@ async def test_helpers(hass: ha.HomeAssistant, skip_dependencies, skip_history):
             SERVICE_ENABLE,
             {"entity_id": "binary_sensor.irrigation_unlimited_c1_z1"},
         )
-        assert hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes["enabled"] is True
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes[
+                "enabled"
+            ]
+            is True
+        )
         assert hass.states.get("switch.zone_1_enabled").state == "on"
 
         # Disable zone 1 via helper
-        await hass.services.async_call("switch", "turn_off", {"entity_id": "switch.zone_1_enabled"}, True)
+        await hass.services.async_call(
+            "switch", "turn_off", {"entity_id": "switch.zone_1_enabled"}, True
+        )
         await hass.async_block_till_done()
         assert hass.states.get("switch.zone_1_enabled").state == "off"
-        assert hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes["enabled"] is False
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes[
+                "enabled"
+            ]
+            is False
+        )
 
         # Enable zone 1
         await exam.call(
             SERVICE_ENABLE,
             {"entity_id": "binary_sensor.irrigation_unlimited_c1_z1"},
         )
-        assert hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes["enabled"] is True
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes[
+                "enabled"
+            ]
+            is True
+        )
         # assert hass.states.get("switch.zone_1_enabled").state == "on"
 
         # Disable zone 1
@@ -124,14 +151,26 @@ async def test_helpers(hass: ha.HomeAssistant, skip_dependencies, skip_history):
             SERVICE_DISABLE,
             {"entity_id": "binary_sensor.irrigation_unlimited_c1_z1"},
         )
-        assert hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes["enabled"] is False
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes[
+                "enabled"
+            ]
+            is False
+        )
         assert hass.states.get("switch.zone_1_enabled").state == "off"
 
         # Enable zone 1 via helper
-        await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.zone_1_enabled"}, True)
+        await hass.services.async_call(
+            "switch", "turn_on", {"entity_id": "switch.zone_1_enabled"}, True
+        )
         await hass.async_block_till_done()
         assert hass.states.get("switch.zone_1_enabled").state == "on"
-        assert hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes["enabled"] is True
+        assert (
+            hass.states.get("binary_sensor.irrigation_unlimited_c1_z1").attributes[
+                "enabled"
+            ]
+            is True
+        )
 
         await exam.finish_test()
         exam.check_summary()

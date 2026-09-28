@@ -1,4 +1,5 @@
 """Global fixtures for irrigation_unlimited integration."""
+
 # Fixtures allow you to replace functions with a Mock object. You can perform
 # many options via the Mock to reflect a particular behavior from the original
 # function that you want to see without going through the function's actual logic.
@@ -22,6 +23,7 @@ import pytest
 # pylint: disable=unused-argument
 
 pytest_plugins = "pytest_homeassistant_custom_component"
+
 
 # This fixture enables loading custom integrations in all tests.
 # Remove to enable selective use of this fixture
@@ -86,6 +88,7 @@ def skip_start():
         return_value=None,
     ):
         yield
+
 
 @pytest.fixture(name="allow_memory_db")
 def allow_memory_db():

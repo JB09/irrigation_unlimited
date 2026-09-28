@@ -33,9 +33,7 @@ def _build_entities(coordinator: IUCoordinator) -> list:
                     IUZoneScheduleEnableSwitch(coordinator, controller, zone, schedule)
                 )
         for sequence in controller.sequences:
-            entities.append(
-                IUSequenceEnableSwitch(coordinator, controller, sequence)
-            )
+            entities.append(IUSequenceEnableSwitch(coordinator, controller, sequence))
             for schedule in sequence.schedules:
                 entities.append(
                     IUSequenceScheduleEnableSwitch(
@@ -45,7 +43,9 @@ def _build_entities(coordinator: IUCoordinator) -> list:
     return entities
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None) -> None:
+async def async_setup_platform(
+    hass, config, async_add_entities, discovery_info=None
+) -> None:
     """Setup switch platform (YAML path)."""
     coordinator: IUCoordinator = hass.data[DOMAIN][COORDINATOR]
     async_add_entities(_build_entities(coordinator))
@@ -103,9 +103,7 @@ class IUControllerManualSwitch(SwitchEntity):
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
-        self._coordinator.service_call(
-            SERVICE_CANCEL, self._controller, None, None, {}
-        )
+        self._coordinator.service_call(SERVICE_CANCEL, self._controller, None, None, {})
         self.async_write_ha_state()
 
 

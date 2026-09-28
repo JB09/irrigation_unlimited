@@ -1,4 +1,5 @@
 """Constants for irrigation_unlimited tests."""
+
 from custom_components.irrigation_unlimited.const import (
     CONF_CONTROLLERS,
     CONF_SCHEDULES,

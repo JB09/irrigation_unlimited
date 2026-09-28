@@ -33,7 +33,9 @@ def _build_entities(coordinator: IUCoordinator) -> list:
     return entities
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None) -> None:
+async def async_setup_platform(
+    hass, config, async_add_entities, discovery_info=None
+) -> None:
     """Setup number platform (YAML path)."""
     coordinator: IUCoordinator = hass.data[DOMAIN][COORDINATOR]
     entities = _build_entities(coordinator)
