@@ -15,6 +15,7 @@
 # See here for more info: https://docs.pytest.org/en/latest/fixture.html (note that
 # pytest includes fixtures OOB which you can use as defined on this page)
 from unittest.mock import patch
+from freezegun import freeze_time
 import pytest
 
 # pylint: disable=invalid-name
@@ -93,4 +94,18 @@ def allow_memory_db():
         "homeassistant.components.recorder.ALLOW_IN_MEMORY_DB",
         return_value=True,
     ):
+        yield
+
+
+# Outside a running test the coordinator works on the wall clock: loading a
+# config, a reload or a service call between tests musters at the real time
+# of day. If a schedule in the config covers that moment a zone switches on and
+# the next test records it switching off, so results depended on when the
+# suite ran. Start every test at the same wall clock time instead, 20:00
+# US/Pacific (the test time zone), which is clear of the test schedules. It
+# keeps ticking for the tests that run in real time
+@pytest.fixture(name="fixed_wall_clock", autouse=True)
+def fixed_wall_clock():
+    """Start the wall clock at a fixed time of day"""
+    with freeze_time("2026-09-28 03:00:00", tick=True):
         yield
