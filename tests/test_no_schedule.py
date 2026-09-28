@@ -1,4 +1,5 @@
 """irrigation_unlimited test with no schedules"""
+
 import homeassistant.core as ha
 from custom_components.irrigation_unlimited.const import (
     SERVICE_MANUAL_RUN,

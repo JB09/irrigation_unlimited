@@ -1,4 +1,5 @@
 """Test irrigation_unlimited switches."""
+
 # pylint: disable=unused-import
 from datetime import timedelta, datetime
 import homeassistant.core as ha

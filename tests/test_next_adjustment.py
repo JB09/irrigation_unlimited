@@ -1,4 +1,5 @@
 """Irrigation Unlimited test for zone next_schedule attribute"""
+
 # pylint: disable=unused-import
 # pylint: disable=unused-argument
 import homeassistant.core as ha

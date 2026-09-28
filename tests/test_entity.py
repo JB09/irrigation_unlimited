@@ -1,4 +1,5 @@
 """Test irrigation_unlimited entity operations."""
+
 from datetime import timedelta
 import homeassistant.core as ha
 from homeassistant.const import (

@@ -32,6 +32,7 @@ async def test_link_ids(hass: ha.HomeAssistant, skip_dependencies, skip_history)
                 == 1
             )
 
+
 async def test_global_link_ids(hass: ha.HomeAssistant, skip_dependencies, skip_history):
     """Test duplicate ids across controllers."""
     # pylint: disable=unused-argument

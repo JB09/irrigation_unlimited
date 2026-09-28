@@ -1,4 +1,5 @@
 """Test irrigation_unlimited cron time interface"""
+
 # pylint: disable=unused-import
 from unittest.mock import patch
 import homeassistant.core as ha

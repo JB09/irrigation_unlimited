@@ -1,9 +1,11 @@
 """irrigation_unlimited model test template"""
+
 # pylint: disable=unused-import
 import homeassistant.core as ha
 from tests.iu_test_support import IUExam
 
 IUExam.quiet_mode()
+
 
 async def test_constraints(hass: ha.HomeAssistant, skip_dependencies, skip_history):
     """Test IUZone constraints."""

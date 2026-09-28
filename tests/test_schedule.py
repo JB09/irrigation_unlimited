@@ -1,4 +1,5 @@
 """Test irrigation_unlimited schedule"""
+
 # pylint: disable=unused-import
 import homeassistant.core as ha
 from tests.iu_test_support import IUExam

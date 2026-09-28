@@ -6,6 +6,10 @@ on:
       - master
       - dev
 
+# Style and tests run on the pull request only. The master ruleset requires
+# them to pass, with the branch up to date, before a merge, so a second run
+# here would test the same code again. Validate stays as the check of what
+# HACS installs from master
 jobs:
   validate:
     runs-on: "ubuntu-latest"
@@ -26,39 +30,3 @@ jobs:
 
         - name: Hassfest validation
           uses: "home-assistant/actions/hassfest@master"
-
-  style:
-    runs-on: "ubuntu-latest"
-    name: Check style formatting
-    steps:
-        - uses: "actions/checkout@v6"
-        - uses: "actions/setup-python@v6"
-          with:
-            python-version: "3.x"
-        - run: python3 -m pip install black
-        - run: black .
-
-  tests:
-    runs-on: "ubuntu-latest"
-    name: Run tests
-    steps:
-      - name: Check out code from GitHub
-        uses: "actions/checkout@v6"
-      - name: Setup Python
-        uses: "actions/setup-python@v6"
-        with:
-          python-version: "3.14"
-      - name: Install requirements
-        run: python3 -m pip install -r requirements_test.txt
-      - name: Run tests
-        run: |
-          pytest \
-            --asyncio-mode=auto \
-            -qq \
-            --timeout=600 \
-            --durations=10 \
-            -n auto \
-            --cov custom_components.irrigation_unlimited \
-            -o console_output_style=count \
-            -p no:sugar \
-            tests

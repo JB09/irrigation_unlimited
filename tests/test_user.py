@@ -1,4 +1,5 @@
 """irrigation_unlimited user data test"""
+
 import homeassistant.core as ha
 from tests.iu_test_support import IUExam
 

@@ -32,8 +32,10 @@ jobs:
         - uses: "actions/setup-python@v6"
           with:
             python-version: "3.x"
-        - run: python3 -m pip install black
-        - run: black .
+        # Pinned so a new black release can not fail the check on its own.
+        # Bump it in a PR together with the reformat it brings
+        - run: python3 -m pip install black==26.5.1
+        - run: black --check --diff .
 
   tests:
     runs-on: "ubuntu-latest"

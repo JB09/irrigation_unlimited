@@ -200,7 +200,7 @@ async def test_service_manual_run_basic(
             {
                 "entity_id": "binary_sensor.irrigation_unlimited_c2_m",
                 "time": "00:21",
-                "sequence_id": '1',
+                "sequence_id": "1",
             },
         )
         await exam.finish_test()

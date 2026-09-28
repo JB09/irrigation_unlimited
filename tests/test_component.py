@@ -1,4 +1,5 @@
 """Test irrigation_unlimited entity operations."""
+
 from unittest.mock import patch
 import homeassistant.core as ha
 from homeassistant.helpers.entity_component import EntityComponent

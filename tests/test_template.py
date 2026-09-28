@@ -1,4 +1,5 @@
 """Test integration_unlimited template calls."""
+
 import homeassistant.core as ha
 from tests.iu_test_support import (
     IUExam,

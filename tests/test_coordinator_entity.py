@@ -1,4 +1,5 @@
 """Test irrigation_unlimited coordinator entity operations."""
+
 import json
 from datetime import datetime
 import homeassistant.core as ha
@@ -139,10 +140,16 @@ async def test_coordinator_config_none(
 
     async with IUExam(hass, "test_coordinator_entity_no_config.yaml") as exam:
         await exam.begin_test(1)
-        assert hass.states.get("irrigation_unlimited.coordinator").attributes.get("configuration") is None
+        assert (
+            hass.states.get("irrigation_unlimited.coordinator").attributes.get(
+                "configuration"
+            )
+            is None
+        )
         await exam.finish_test()
 
         exam.check_summary()
+
 
 async def test_coordinator_config_extended(
     hass: ha.HomeAssistant, skip_dependencies, skip_history
@@ -159,10 +166,36 @@ async def test_coordinator_config_extended(
         )
 
         controller_keys = ("controller_id", "entity_base", "icon", "status")
-        zone_keys = ("zone_id", "entity_base", "icon", "status", "current_duration", "switch_entity_id")
-        sequence_keys = ("icon", "status", "default_duration", "default_delay", "duration_factor", "total_delay", "total_delay", "adjusted_duration", "current_duration")
+        zone_keys = (
+            "zone_id",
+            "entity_base",
+            "icon",
+            "status",
+            "current_duration",
+            "switch_entity_id",
+        )
+        sequence_keys = (
+            "icon",
+            "status",
+            "default_duration",
+            "default_delay",
+            "duration_factor",
+            "total_delay",
+            "total_delay",
+            "adjusted_duration",
+            "current_duration",
+        )
         schedule_keys = ("time", "anchor", "duration", "name", "enabled")
-        sqz_keys = ("icon", "status", "delay", "base_duration", "adjusted_duration", "final_duration", "zones", "current_duration")
+        sqz_keys = (
+            "icon",
+            "status",
+            "delay",
+            "base_duration",
+            "adjusted_duration",
+            "final_duration",
+            "zones",
+            "current_duration",
+        )
         assert len(config["controllers"]) > 0
         for controller in config["controllers"]:
             assert all(key in controller for key in controller_keys)

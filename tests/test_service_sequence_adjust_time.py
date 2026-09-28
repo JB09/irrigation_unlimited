@@ -1,4 +1,5 @@
 """irrigation_unlimited service adjust_time tester"""
+
 from unittest.mock import patch
 import json
 import homeassistant.core as ha
@@ -339,8 +340,8 @@ async def test_service_sequence_adjust_time_by_controller(
             data = json.loads(sta.attributes["configuration"])
             assert data["controllers"][0]["sequences"][0]["adjustment"] == "%50.0"
             assert data["controllers"][0]["sequences"][1]["adjustment"] == "%50.0"
-        exam.check_iu_entity('c1_s1', "off", {"adjustment": "%50.0"})
-        exam.check_iu_entity('c1_s2', "off", {"adjustment": "%50.0"})
+        exam.check_iu_entity("c1_s1", "off", {"adjustment": "%50.0"})
+        exam.check_iu_entity("c1_s2", "off", {"adjustment": "%50.0"})
         await exam.finish_test()
 
         # Reset zone adjustments. Test 'all' sequence_id (0) reset
@@ -367,8 +368,8 @@ async def test_service_sequence_adjust_time_by_controller(
             data = json.loads(sta.attributes["configuration"])
             assert data["controllers"][0]["sequences"][0]["adjustment"] == ""
             assert data["controllers"][0]["sequences"][1]["adjustment"] == ""
-        exam.check_iu_entity('c1_s1', "off", {"adjustment": ""})
-        exam.check_iu_entity('c1_s2', "off", {"adjustment": ""})
+        exam.check_iu_entity("c1_s1", "off", {"adjustment": ""})
+        exam.check_iu_entity("c1_s2", "off", {"adjustment": ""})
         await exam.finish_test()
 
         await exam.begin_test(14)
@@ -561,7 +562,7 @@ async def test_service_sequence_adjust_time_bad_by_controller(
                 SERVICE_TIME_ADJUST,
                 {
                     "entity_id": "binary_sensor.irrigation_unlimited_c1_m",
-                    "sequence_id": [1, 'no_exist'],
+                    "sequence_id": [1, "no_exist"],
                     "reset": None,
                 },
             )
@@ -570,7 +571,6 @@ async def test_service_sequence_adjust_time_bad_by_controller(
             sum([1 for call in mock.call_args_list if call.args[1] == "SEQUENCE_ID"])
             == 1
         )
-
 
 
 async def test_service_sequence_adjust_time_by_sequence(
@@ -887,8 +887,8 @@ async def test_service_sequence_adjust_time_by_sequence(
             data = json.loads(sta.attributes["configuration"])
             assert data["controllers"][0]["sequences"][0]["adjustment"] == "%50.0"
             assert data["controllers"][0]["sequences"][1]["adjustment"] == "%50.0"
-        exam.check_iu_entity('c1_s1', "off", {"adjustment": "%50.0"})
-        exam.check_iu_entity('c1_s2', "off", {"adjustment": "%50.0"})
+        exam.check_iu_entity("c1_s1", "off", {"adjustment": "%50.0"})
+        exam.check_iu_entity("c1_s2", "off", {"adjustment": "%50.0"})
         await exam.finish_test()
 
         # Reset zone adjustments. Test 'all' sequence_id (0) reset
@@ -914,8 +914,8 @@ async def test_service_sequence_adjust_time_by_sequence(
             data = json.loads(sta.attributes["configuration"])
             assert data["controllers"][0]["sequences"][0]["adjustment"] == ""
             assert data["controllers"][0]["sequences"][1]["adjustment"] == ""
-        exam.check_iu_entity('c1_s1', "off", {"adjustment": ""})
-        exam.check_iu_entity('c1_s2', "off", {"adjustment": ""})
+        exam.check_iu_entity("c1_s1", "off", {"adjustment": ""})
+        exam.check_iu_entity("c1_s2", "off", {"adjustment": ""})
         await exam.finish_test()
 
         await exam.begin_test(14)
