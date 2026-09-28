@@ -4727,7 +4727,12 @@ class IUSequence(IUBase):
 
     def service_skip_run(self, data: MappingProxyType, stime: datetime) -> bool:
         """Service handler for skip_run. Waive the next scheduled run(s)
-        without disturbing the schedule itself"""
+        without disturbing the schedule itself.
+
+        A plain call (no count, no until) is idempotent. It waives the next
+        run only when no future run is already waived, so an automation that
+        re-fires can not stack skips. Pass count to waive additional runs on
+        top of any already waived"""
         changed = False
         if CONF_RESET in data:
             if self._skipped_runs or self._skip_until is not None:
@@ -4740,8 +4745,19 @@ class IUSequence(IUBase):
                 self._skip_until = until
                 changed = True
             changed |= self._skip_queued_runs(None, until)
+        elif CONF_COUNT in data:
+            changed |= self._skip_queued_runs(data[CONF_COUNT], None)
         else:
-            changed |= self._skip_queued_runs(data.get(CONF_COUNT, 1), None)
+            # The muster ahead of the service call ran at the tick time which
+            # can trail stime, so drop anything that has closed since then
+            if self.prune_skipped(stime):
+                self.request_update()
+            if any(start > stime for start in self._skipped_runs):
+                self._coordinator.logger.log_skip_already_waived(
+                    stime, self._controller, self
+                )
+            else:
+                changed |= self._skip_queued_runs(1, None)
         if changed:
             self.clear_scheduled_runs()
             self.request_update()
@@ -6404,6 +6420,25 @@ class IULogger:
     def log_sequence_required(self, vtime: datetime, level=WARNING) -> None:
         """Warn that a service call must nominate a sequence"""
         self._format(level, "ENTITY", vtime, "Service call requires a sequence")
+
+    def log_skip_already_waived(
+        self,
+        vtime: datetime,
+        controller: IUController,
+        sequence: IUSequence,
+        level=INFO,
+    ) -> None:
+        """Message that a plain skip_run call was ignored because the next
+        run of the sequence is already waived"""
+        idl = IUBase.idl([controller, sequence], "0", 1)
+        self._format(
+            level,
+            "SKIP_RUN",
+            vtime,
+            f"Next run already waived: "
+            f"controller: {idl[0]}, "
+            f"sequence: {idl[1]}",
+        )
 
     def log_invalid_zone(
         self,
