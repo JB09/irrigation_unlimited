@@ -409,7 +409,7 @@ skip_zone:
 
 skip_run:
   name: Skip run
-  description: Waive the next scheduled run(s) of a sequence leaving the schedule intact. To advance a running sequence to its next zone see skip_zone
+  description: Waive the next scheduled run(s) of a sequence leaving the schedule intact. Without count or until the call is idempotent and safe to repeat - the next run is waived only if no future run is already waived. count waives that many additional runs and accumulates across calls, until is absolute and reset reinstates everything. To advance a running sequence to its next zone see skip_zone
   fields:
     entity_id:
       name: Entity Id
@@ -434,7 +434,7 @@ skip_run:
 
     count:
       name: Count
-      description: The number of scheduled runs to waive (default 1)
+      description: Number of additional scheduled runs to waive, on top of any already waived. Repeated calls accumulate.
       example: 1
       required: false
       selector:

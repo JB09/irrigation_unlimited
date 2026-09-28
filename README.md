@@ -904,17 +904,17 @@ Waive the next scheduled run(s) of a sequence. The schedule itself is left compl
 
 Only runs which have not started are candidates. A run already in progress is untouched; use [`cancel`](#74-action-cancel) for that. Manual runs are never skipped.
 
-Waived runs survive a restart and are listed in the sequence entity's `skipped` attribute. Each record is dropped once its run can no longer be built.
+Waived runs survive a restart and are listed in the sequence entity's `skipped` attribute, with any `until` cut off in `skip_until`. Check those two attributes to see what is currently waived. Each record is dropped once its run can no longer be built.
 
 | Service data attribute | Type | Required | Description |
 | ---------------------- | ---- | -------- | ----------- |
 | `entity_id` | [string/list](#141-irrigation-unlimited-entities) | yes | Sequence to skip. May also be a controller, in which case `sequence_id` is required. |
 | `sequence_id` | [number/list](#145-sequence) | only if entity_id represents a controller | Sequences to skip. If set to 0 then all sequences of the controller are effected. |
-| `count` | number | see below* | The number of scheduled runs to waive. Defaults to 1. |
+| `count` | number | see below* | Number of additional scheduled runs to waive, on top of any already waived. Repeated calls accumulate. |
 | `until` | string | see below* | Waive every scheduled run starting before this point in time. Format is `%Y-%m-%d %H:%M:%S` for example `2023-08-01 07:30:00`. |
 | `reset` | none | see below* | Reinstate all the waived runs. |
 
-\* At most one of `count`, `until` or `reset`. With none of them the next scheduled run is waived.
+\* At most one of `count`, `until` or `reset`. With none of them the next scheduled run is waived, unless a future run is already waived in which case the call does nothing.
 
 Skip today's 10:30 pass of a sequence:
 
@@ -924,7 +924,12 @@ Skip today's 10:30 pass of a sequence:
     entity_id: binary_sensor.irrigation_unlimited_c1_s4
 ```
 
-Calls accumulate, so two calls of `count: 1` waive two runs. Shrinking a previous `until` does not reinstate anything - use `reset` and skip again.
+How repeated calls combine depends on the form used:
+
+- **Plain call** (no `count`, no `until`) is idempotent and safe to repeat. It waives the next run only if no future run of the sequence is already waived. An automation that re-fires, say on a rain sensor hovering around its threshold, therefore skips one run rather than one per trigger.
+- **`count`** is additive. Each call waives that many more runs beyond those already waived, so two calls of `count: 1` waive two runs, and `count: 1` after a plain call waives a second run.
+- **`until`** is absolute. Repeating the same `until` changes nothing. Shrinking a previous `until` does not reinstate anything - use `reset` and skip again.
+- **`reset`** reinstates everything waived by any of the above.
 
 Notes:
 
